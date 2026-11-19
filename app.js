@@ -37,6 +37,7 @@ let lastRightDist = 0;
 let isTwoFingerGesture = false;
 let lastTouchAngle = 0;
 let lastTouchDist = 0;
+let lastTouchClient = { x: 0, y: 0 };
 let preTouchSnapshot = null;
 
 let desktopShow3D = true;
@@ -70,7 +71,6 @@ const RING_NAMES = {
   12: "環十二烷", 14: "環十四烷", 16: "環十六烷", 18: "環十八烷"
 };
 
-// 芳香環與生醫常見環模板定義
 const RING_TEMPLATES = [
   {
     key: "benzene",
@@ -122,7 +122,6 @@ const RING_TEMPLATES = [
   }
 ];
 
-// 本地雙語常用生化/醫藥分子字典（支援即時自動比對）
 const LOCAL_COMPOUNDS = [
   { zh: "咖啡因", en: "caffeine" },
   { zh: "阿斯匹靈", en: "aspirin" },
@@ -188,11 +187,17 @@ function isMobileView() {
   return window.innerWidth <= 900;
 }
 
+function closeAllModals() {
+  document.getElementById("ringLibModal")?.classList.add("hidden");
+  document.getElementById("ptModal")?.classList.add("hidden");
+}
+
 window.addEventListener("DOMContentLoaded", () => {
   init3DViewer();
   buildPeriodicTable();
   buildRingLibrary();
   applyResponsiveLayout();
+  resizeCanvas();
   window.addEventListener("resize", applyResponsiveLayout);
   bindUIEvents();
 
@@ -212,7 +217,7 @@ function applyResponsiveLayout() {
       viewerPane.classList.add("hidden");
       toggleBtn.classList.remove("active");
       toggleBtn.textContent = "👁 2D → 3D";
-      setTimeout(resizeCanvas, 30);
+      requestAnimationFrame(resizeCanvas);
     } else {
       editorPane.classList.add("hidden");
       viewerPane.classList.remove("hidden");
@@ -231,18 +236,19 @@ function applyResponsiveLayout() {
     viewerPane.classList.toggle("hidden", !desktopShow3D);
     toggleBtn.classList.toggle("active", desktopShow3D);
     toggleBtn.textContent = "👁 2D / 3D";
-    setTimeout(() => {
+    requestAnimationFrame(() => {
       resizeCanvas();
       if (viewer3D && desktopShow3D) {
         viewer3D.resize();
         viewer3D.render();
       }
-    }, 30);
+    });
   }
 }
 
 function setActiveTool(mode) {
   currentMode = mode;
+  closeAllModals();
   document.querySelectorAll(".dock-btn").forEach((b) => b.classList.remove("active"));
   document.getElementById("btnErase").classList.remove("active");
 
@@ -286,7 +292,6 @@ function buildRingLibrary() {
       document.querySelectorAll(".ring-lib-item").forEach((el) => el.classList.remove("active"));
       item.classList.add("active");
       setActiveTool("ring");
-      document.getElementById("ringLibModal").classList.add("hidden");
     });
     grid.appendChild(item);
   });
@@ -303,7 +308,6 @@ function buildPeriodicTable() {
     cell.style.gridColumn = col;
     cell.addEventListener("click", () => {
       selectAtomElement(el);
-      document.getElementById("ptModal").classList.add("hidden");
     });
     grid.appendChild(cell);
   });
@@ -311,6 +315,7 @@ function buildPeriodicTable() {
 
 function selectAtomElement(el) {
   currentElement = el;
+  closeAllModals();
   document.querySelectorAll(".atom-btn").forEach((b) => b.classList.remove("active"));
   const existingBtn = document.querySelector(`.atom-btn[data-atom="${el}"]`);
   if (existingBtn) {
@@ -322,7 +327,6 @@ function selectAtomElement(el) {
     document.getElementById("openPtBtn").classList.add("active");
   }
 
-  // 當按下右側原子時，若原本在添加環化物（或非畫鍵模式），自動切回「添加原子」模式
   if (currentMode !== "bond") {
     setActiveTool("atom");
   }
@@ -372,7 +376,13 @@ function loadSmilesTo2D(smiles) {
       });
     }
 
-    const rect = canvas.parentElement.getBoundingClientRect();
+    let rect = canvas.parentElement.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) {
+      rect = { width: window.innerWidth, height: window.innerHeight };
+    } else {
+      resizeCanvas();
+    }
+
     const molW = Math.max(1, maxX - minX);
     const molH = Math.max(1, maxY - minY);
     const safeW = Math.max(160, rect.width - 110);
@@ -443,6 +453,7 @@ function exportCanvasToMolfile() {
 
 function draw() {
   const rect = canvas.parentElement.getBoundingClientRect();
+  if (rect.width === 0 || rect.height === 0) return;
   ctx.clearRect(0, 0, rect.width, rect.height);
 
   ctx.save();
@@ -508,7 +519,6 @@ function draw() {
     ctx.stroke();
     ctx.setLineDash([]);
 
-    // 繪製環數提示標籤
     const cx = preview.reduce((s, p) => s + p.x, 0) / preview.length;
     const cy = preview.reduce((s, p) => s + p.y, 0) / preview.length;
     const label = RING_NAMES[dragRingSides]
@@ -660,7 +670,6 @@ function drawCurvedArrow(arr, highlight = false, showHandle = false) {
   ctx.closePath();
   ctx.fill();
 
-  // 被選取時顯示弧度拖曳控制點
   if (showHandle) {
     const midX = 0.25 * x1 + 0.5 * cx + 0.25 * x2;
     const midY = 0.25 * y1 + 0.5 * cy + 0.25 * y2;
@@ -760,7 +769,6 @@ canvas.addEventListener("mousemove", (e) => {
   const pos = getMousePos(e);
   hoverPos = pos;
 
-  // 右鍵拖曳：同時旋轉與縮放
   if (isRightRotating) {
     const currentAngle = Math.atan2(pos.y - rotateCenter.y, pos.x - rotateCenter.x);
     const deltaAngle = currentAngle - lastRotateAngle;
@@ -800,7 +808,6 @@ canvas.addEventListener("mousemove", (e) => {
     return;
   }
 
-  // 移動化合物模式拖曳
   if (dragMoveLast) {
     const dx = pos.x - dragMoveLast.x;
     const dy = pos.y - dragMoveLast.y;
@@ -811,7 +818,6 @@ canvas.addEventListener("mousemove", (e) => {
     return;
   }
 
-  // 拖曳彎箭頭弧度控制點
   if (dragArrowCurve && selectedArrow) {
     const dx = selectedArrow.x2 - selectedArrow.x1;
     const dy = selectedArrow.y2 - selectedArrow.y1;
@@ -826,16 +832,16 @@ canvas.addEventListener("mousemove", (e) => {
     return;
   }
 
-  // 拖曳變換環的邊數 (3 ~ 18 環)
+  // 拖曳變換環的邊數 (3 ~ 18 環，依螢幕實際距離計算以維持縮放一致性)
   if (dragRingStart && currentRingType === "polygon") {
     const dx = pos.x - dragRingStart.x;
     const dy = pos.y - dragRingStart.y;
-    const dist = Math.hypot(dx, dy);
-    if (dist < 14) {
+    const screenDist = Math.hypot(dx, dy) * zoom;
+    if (screenDist < 14) {
       dragRingSides = 6;
       dragRingAngle = -Math.PI / 2;
     } else {
-      dragRingSides = Math.min(18, Math.max(3, Math.floor((dist - 14) / 14) + 3));
+      dragRingSides = Math.min(18, Math.max(3, Math.floor((screenDist - 14) / 14) + 3));
       dragRingAngle = Math.atan2(dy, dx);
     }
     dragPos = pos;
@@ -863,9 +869,9 @@ canvas.addEventListener("mousemove", (e) => {
 });
 
 canvas.addEventListener("mousedown", (e) => {
+  closeAllModals();
   const pos = getMousePos(e);
 
-  // 右鍵按下：啟動旋轉 + 縮放
   if (e.button === 2) {
     if (atoms.length === 0) return;
     saveState();
@@ -885,7 +891,6 @@ canvas.addEventListener("mousedown", (e) => {
     return;
   }
 
-  // 若正在拖曳已選取彎箭頭的弧度控制點
   if (selectedArrow && isNearArrowHandle(pos, selectedArrow)) {
     saveState();
     dragArrowCurve = true;
@@ -896,7 +901,6 @@ canvas.addEventListener("mousedown", (e) => {
   const hitBond = hitAtom ? null : findBondAt(pos);
   const hitArrow = (!hitAtom && !hitBond) ? findArrowAt(pos) : null;
 
-  // 移動化合物模式
   if (currentMode === "move") {
     if (hitArrow) {
       showArrowControlBar(hitArrow);
@@ -910,7 +914,6 @@ canvas.addEventListener("mousedown", (e) => {
     return;
   }
 
-  // 橡皮擦模式
   if (currentMode === "erase") {
     if (hitAtom) {
       saveState();
@@ -928,8 +931,8 @@ canvas.addEventListener("mousedown", (e) => {
     return;
   }
 
-  // 添加 / 替換原子模式
   if (currentMode === "atom") {
+    if (hitAtom && hitAtom.el === currentElement) return;
     saveState();
     if (hitAtom) {
       hitAtom.el = currentElement;
@@ -947,7 +950,6 @@ canvas.addEventListener("mousedown", (e) => {
     return;
   }
 
-  // 孤電子對模式
   if (currentMode === "lonepair" && hitAtom) {
     saveState();
     hitAtom.lonePairs = ((hitAtom.lonePairs || 0) + 1) % 5;
@@ -955,7 +957,6 @@ canvas.addEventListener("mousedown", (e) => {
     return;
   }
 
-  // 電子轉移彎箭頭模式
   if (currentMode === "arrow") {
     if (hitArrow) {
       showArrowControlBar(hitArrow);
@@ -967,7 +968,6 @@ canvas.addEventListener("mousedown", (e) => {
     return;
   }
 
-  // 正負電荷模式
   if (currentMode === "charge" && hitAtom) {
     saveState();
     hitAtom.charge = hitAtom.charge === currentChargeVal ? 0 : currentChargeVal;
@@ -975,7 +975,6 @@ canvas.addEventListener("mousedown", (e) => {
     return;
   }
 
-  // 環狀結構模式（拖曳多邊形環 或 芳香/生醫環模板）
   if (currentMode === "ring") {
     if (currentRingType === "polygon") {
       dragRingStart = hitAtom ? { x: hitAtom.x, y: hitAtom.y } : pos;
@@ -992,7 +991,6 @@ canvas.addEventListener("mousedown", (e) => {
     return;
   }
 
-  // 化學鍵繪製模式
   if (currentMode === "bond") {
     if (hitBond) {
       saveState();
@@ -1045,7 +1043,7 @@ window.addEventListener("mouseup", (e) => {
   }
 
   if (dragArrowStart) {
-    const pos = getMousePos(e);
+    const pos = dragPos || getMousePos(e);
     const targetAtom = findAtomAt(pos);
     const endPos = targetAtom ? { x: targetAtom.x, y: targetAtom.y } : pos;
     if (Math.hypot(endPos.x - dragArrowStart.x, endPos.y - dragArrowStart.y) > 12) {
@@ -1095,11 +1093,10 @@ window.addEventListener("mouseup", (e) => {
   draw();
 });
 
-// === 手機觸控支援（單指繪圖/移動 + 雙指旋轉縮放，防止雙指縮放時誤加原子） ===
+// === 手機觸控支援 ===
 canvas.addEventListener("touchstart", (e) => {
   e.preventDefault();
   if (e.touches.length >= 2) {
-    // 若第一根手指剛觸發單指動作，立即還原快照避免留下多餘原子
     if (!isTwoFingerGesture && preTouchSnapshot) {
       const snap = JSON.parse(preTouchSnapshot);
       atoms = snap.atoms;
@@ -1135,6 +1132,7 @@ canvas.addEventListener("touchstart", (e) => {
   if (e.touches.length === 1 && !isTwoFingerGesture) {
     preTouchSnapshot = JSON.stringify({ atoms, bonds, arrows });
     const t = e.touches[0];
+    lastTouchClient = { x: t.clientX, y: t.clientY };
     canvas.dispatchEvent(new MouseEvent("mousedown", {
       clientX: t.clientX,
       clientY: t.clientY,
@@ -1190,6 +1188,7 @@ canvas.addEventListener("touchmove", (e) => {
 
   if (e.touches.length === 1 && !isTwoFingerGesture) {
     const t = e.touches[0];
+    lastTouchClient = { x: t.clientX, y: t.clientY };
     canvas.dispatchEvent(new MouseEvent("mousemove", {
       clientX: t.clientX,
       clientY: t.clientY
@@ -1200,7 +1199,11 @@ canvas.addEventListener("touchmove", (e) => {
 canvas.addEventListener("touchend", (e) => {
   if (e.touches.length === 0) {
     if (!isTwoFingerGesture) {
-      window.dispatchEvent(new MouseEvent("mouseup", { button: 0 }));
+      window.dispatchEvent(new MouseEvent("mouseup", {
+        clientX: lastTouchClient.x,
+        clientY: lastTouchClient.y,
+        button: 0
+      }));
     }
     isTwoFingerGesture = false;
     preTouchSnapshot = null;
@@ -1215,7 +1218,6 @@ function buildPolygonVertices(anchor, sides, dragAngle, attachAtom) {
   const vertices = [];
 
   if (attachAtom) {
-    // 頂點 0 錨定在現有原子，環心沿拖曳方向延伸
     const cx = anchor.x + Math.cos(dragAngle) * radius;
     const cy = anchor.y + Math.sin(dragAngle) * radius;
     const startAngle = dragAngle + Math.PI;
@@ -1325,15 +1327,15 @@ function getRingTemplateGeometry(type, anchor, attachAtom) {
     const y7 = 0;
 
     rawAtoms = [
-      { x: 0, y: -R, el: "C" },   // 0: C6
-      { x: x1, y: y1, el: "C" },  // 1: C5
-      { x: x2, y: y2, el: "C" },  // 2: C4
-      { x: 0, y: R, el: "N" },    // 3: N3
-      { x: -hx, y: hy, el: "C" }, // 4: C2
-      { x: -hx, y: -hy, el: "N" },// 5: N1
-      { x: x6, y: y6, el: "N" },  // 6: N7
-      { x: x7, y: y7, el: "C" },  // 7: C8
-      { x: x8, y: y8, el: "N" }   // 8: N9
+      { x: 0, y: -R, el: "C" },
+      { x: x1, y: y1, el: "C" },
+      { x: x2, y: y2, el: "C" },
+      { x: 0, y: R, el: "N" },
+      { x: -hx, y: hy, el: "C" },
+      { x: -hx, y: -hy, el: "N" },
+      { x: x6, y: y6, el: "N" },
+      { x: x7, y: y7, el: "C" },
+      { x: x8, y: y8, el: "N" }
     ];
     rawBonds = [
       { a1: 0, a2: 1, order: 1 }, { a1: 1, a2: 2, order: 2 }, { a1: 2, a2: 3, order: 1 },
@@ -1428,7 +1430,6 @@ function placeRingTemplate(type, anchor, attachAtom) {
 }
 
 function bindUIEvents() {
-  // 左側工具列按鈕
   document.querySelectorAll(".dock-btn[data-tool]").forEach((btn) => {
     btn.addEventListener("click", () => {
       const tool = btn.getAttribute("data-tool");
@@ -1439,7 +1440,6 @@ function bindUIEvents() {
     });
   });
 
-  // 芳香環與生醫環模板按鈕
   const openRingLibBtn = document.getElementById("openRingLibBtn");
   const closeRingLibBtn = document.getElementById("closeRingLibBtn");
   if (openRingLibBtn) {
@@ -1454,14 +1454,12 @@ function bindUIEvents() {
     });
   }
 
-  // 右側元素按鈕
   document.querySelectorAll(".atom-btn").forEach((btn) => {
     btn.addEventListener("click", () => {
       selectAtomElement(btn.getAttribute("data-atom"));
     });
   });
 
-  // 元素週期表彈窗
   const openPtBtn = document.getElementById("openPtBtn");
   const closePtBtn = document.getElementById("closePtBtn");
   if (openPtBtn) {
@@ -1476,12 +1474,10 @@ function bindUIEvents() {
     });
   }
 
-  // 橡皮擦
   document.getElementById("btnErase").addEventListener("click", () => {
     setActiveTool("erase");
   });
 
-  // 清空畫布
   document.getElementById("btnClear").addEventListener("click", () => {
     saveState();
     atoms = [];
@@ -1491,7 +1487,6 @@ function bindUIEvents() {
     draw();
   });
 
-  // 復原 / 重做
   document.getElementById("btnUndo").addEventListener("click", () => {
     if (history.length === 0) return;
     redoStack.push(JSON.stringify({ atoms, bonds, arrows }));
@@ -1514,7 +1509,7 @@ function bindUIEvents() {
     draw();
   });
 
-  // 電子轉移彎箭頭微調按鈕：弧度向上、弧度向下、去/回翻轉
+  // 電子轉移彎箭頭：弧度向上、弧度向下（平滑漸進調整）、去/回翻轉
   document.getElementById("btnArrowCurveUp").addEventListener("click", () => {
     if (!selectedArrow) return;
     saveState();
@@ -1524,11 +1519,7 @@ function bindUIEvents() {
     const ny = dx / dist;
     const upSign = ny >= 0 ? -1 : 1;
     const currentCurve = typeof selectedArrow.curve === "number" ? selectedArrow.curve : 0.35;
-    if (Math.sign(currentCurve) !== upSign) {
-      selectedArrow.curve = upSign * Math.max(0.35, Math.abs(currentCurve));
-    } else {
-      selectedArrow.curve = upSign * Math.min(0.95, Math.abs(currentCurve) + 0.16);
-    }
+    selectedArrow.curve = Math.max(-0.95, Math.min(0.95, currentCurve + upSign * 0.18));
     draw();
   });
 
@@ -1541,11 +1532,7 @@ function bindUIEvents() {
     const ny = dx / dist;
     const downSign = ny >= 0 ? 1 : -1;
     const currentCurve = typeof selectedArrow.curve === "number" ? selectedArrow.curve : 0.35;
-    if (Math.sign(currentCurve) !== downSign) {
-      selectedArrow.curve = downSign * Math.max(0.35, Math.abs(currentCurve));
-    } else {
-      selectedArrow.curve = downSign * Math.min(0.95, Math.abs(currentCurve) + 0.16);
-    }
+    selectedArrow.curve = Math.max(-0.95, Math.min(0.95, currentCurve + downSign * 0.18));
     draw();
   });
 
@@ -1575,7 +1562,6 @@ function bindUIEvents() {
     draw();
   });
 
-  // 自動重整結構
   let chairFlipState = false;
 
   document.getElementById("btnClean").addEventListener("click", () => {
@@ -1632,7 +1618,6 @@ function bindUIEvents() {
     }
   });
 
-  // 椅型構象 / 環翻轉
   document.getElementById("btnChair").addEventListener("click", () => {
     const ring6 = findSixMemberedRing();
     if (!ring6) {
@@ -1692,7 +1677,6 @@ function bindUIEvents() {
     draw();
   });
 
-  // 置中與縮放按鈕
   document.getElementById("btnCenter").addEventListener("click", () => {
     if (atoms.length === 0) return;
     const rect = canvas.parentElement.getBoundingClientRect();
@@ -1717,7 +1701,6 @@ function bindUIEvents() {
     draw();
   });
 
-  // 2D / 3D 切換（手機版為全螢幕 2D <-> 全螢幕 3D 切換）
   document.getElementById("toggle3DBtn").addEventListener("click", () => {
     if (isMobileView()) {
       mobileActivePane = mobileActivePane === "2d" ? "3d" : "2d";
@@ -1727,7 +1710,6 @@ function bindUIEvents() {
     applyResponsiveLayout();
   });
 
-  // 2D 轉 3D 按鈕（手機版自動切換至全螢幕 3D 畫面）
   document.getElementById("syncBtn").addEventListener("click", () => {
     const molfile = exportCanvasToMolfile();
     if (!molfile) return;
@@ -1746,7 +1728,6 @@ function bindUIEvents() {
     }
   });
 
-  // 搜尋自動完成與查詢
   setupSearchAutocomplete();
 
   document.getElementById("styleSelect").addEventListener("change", (e) => {
@@ -1826,7 +1807,6 @@ function bindUIEvents() {
   });
 }
 
-// === 搜尋欄位即時自動完成（不顯示推薦字眼） ===
 function setupSearchAutocomplete() {
   const input = document.getElementById("searchInput");
   const listEl = document.getElementById("searchSuggestions");
@@ -1852,7 +1832,7 @@ function setupSearchAutocomplete() {
     }
 
     listEl.innerHTML = "";
-    items.forEach((item, idx) => {
+    items.forEach((item) => {
       const div = document.createElement("div");
       div.className = "search-item";
       if (item.zh) {
@@ -1885,7 +1865,6 @@ function setupSearchAutocomplete() {
 
     renderSuggestions(localMatches);
 
-    // 若為英文輸入且 >= 2 字元，同步向 PubChem Autocomplete 補齊候選詞
     if (/^[A-Za-z0-9\- ]{2,}$/.test(q)) {
       debounceTimer = setTimeout(async () => {
         try {
@@ -2065,7 +2044,6 @@ function parseSdfForRotation(sdfText) {
 
   const countsLine = lines[3];
 
-  // === 模式 A：支援本地演算產生的 V3000 格式 ===
   if (countsLine.includes("V3000")) {
     const parsedAtoms = [];
     const parsedBonds = [];
@@ -2100,7 +2078,6 @@ function parseSdfForRotation(sdfText) {
     return parsedAtoms.length > 0 ? { parsedAtoms, parsedBonds } : null;
   }
 
-  // === 模式 B：支援 PubChem 雲端回傳的 V2000 格式 ===
   const nAtoms = parseInt(countsLine.slice(0, 3).trim(), 10);
   const nBonds = parseInt(countsLine.slice(3, 6).trim(), 10);
   if (isNaN(nAtoms) || isNaN(nBonds)) return null;
