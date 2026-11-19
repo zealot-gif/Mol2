@@ -37,7 +37,6 @@ html, body {
   touch-action: none;
 }
 
-/* 原版 MolView 懸浮工具島 */
 .floating-bar, .floating-dock, .zoom-badge, .arrow-control-bar {
   position: absolute;
   background: rgba(248, 250, 252, 0.95);
@@ -98,7 +97,6 @@ html, body {
   background: transparent;
 }
 
-/* 搜尋自動完成清單 (不顯示任何推薦字眼) */
 .search-suggestions {
   position: absolute;
   top: calc(100% + 5px);
@@ -206,7 +204,6 @@ html, body {
 .pt-trigger-btn { color: #0284c7; font-weight: 800; letter-spacing: 1px; }
 .h-divider { height: 1px; width: 22px; background: #cbd5e1; margin: 2px auto; flex-shrink: 0; }
 
-/* 芳香環與生醫環模板彈窗 */
 .ring-lib-modal {
   position: absolute;
   top: 52%;
@@ -260,7 +257,6 @@ html, body {
 .ring-lib-text strong { font-size: 0.82rem; }
 .ring-lib-text span { font-size: 0.68rem; color: #64748b; }
 
-/* 電子轉移彎箭頭微調浮動列 */
 .arrow-control-bar {
   bottom: 48px;
   left: 50%;
@@ -293,7 +289,6 @@ html, body {
 .arrow-ctrl-btn.danger:hover { background: #fee2e2; border-color: #dc2626; color: #dc2626; }
 .arrow-ctrl-btn.close { border: none; background: transparent; color: #64748b; padding: 4px 6px; }
 
-/* 完整元素週期表懸浮卡片 */
 .pt-modal {
   position: absolute;
   top: 50%;
@@ -417,7 +412,6 @@ html, body {
 .badge.cloud { background: rgba(56, 189, 248, 0.2); color: #38bdf8; }
 .badge.local { background: rgba(251, 191, 36, 0.2); color: #fbbf24; }
 
-/* 3D 單鍵二面角旋轉控制盒 */
 .torsion-box {
   background: rgba(15, 23, 42, 0.88);
   backdrop-filter: blur(8px);
@@ -448,7 +442,6 @@ html, body {
 #torsionSlider { width: 100%; accent-color: #38bdf8; cursor: pointer; }
 .torsion-status { margin-top: 4px; font-size: 0.72rem; color: #94a3b8; text-align: right; }
 
-/* 手機畫面：完整全螢幕 2D，點擊切換為全螢幕 3D */
 @media (max-width: 900px) {
   html, body {
     height: 100dvh;
