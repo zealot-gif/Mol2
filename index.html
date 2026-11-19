@@ -5,7 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>MolView</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><polygon points='32,6 54,19 54,45 32,58 10,45 10,19' fill='none' stroke='%230284c7' stroke-width='5'/><circle cx='32' cy='32' r='13' fill='none' stroke='%230284c7' stroke-width='4'/></svg>">
-  <link rel="stylesheet" href="style.css?v=6" />
+  <style>
+    .hidden { display: none !important; }
+    html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; }
+  </style>
+  <link rel="stylesheet" href="./style.css?v=7" />
 
   <!-- 3Dmol.js 3D 渲染引擎 -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/3Dmol/2.1.0/3Dmol-min.js"></script>
@@ -45,7 +49,7 @@
         <button class="tool-icon" id="btnZoomOut" title="縮小">⊖</button>
       </div>
 
-      <!-- 左側直立工具島：移動、原子、鍵結、電荷、孤電子對、電子轉移箭頭與環狀模板 -->
+      <!-- 左側直立工具島 -->
       <div class="floating-dock left-dock">
         <button class="dock-btn" data-tool="move" title="移動化合物 (拖曳整個分子，避免手機縮放誤觸)">✋</button>
         <button class="dock-btn" data-tool="atom" title="添加 / 替換原子">⚛</button>
@@ -108,7 +112,7 @@
         <div class="pt-grid" id="ptGrid"></div>
       </div>
 
-      <!-- 左下角縮放百分比與目前工具提示標籤 -->
+      <!-- 左下角縮放百分比標籤 -->
       <div class="zoom-badge" id="zoomBadge">100%</div>
 
       <!-- 原生高解析 HTML5 化學繪圖畫布 -->
@@ -124,7 +128,7 @@
           <option value="line">線框模型 (Wireframe)</option>
         </select>
 
-        <!-- 單鍵二面角旋轉控制盒 (觀察 Staggered / Eclipsed) -->
+        <!-- 單鍵二面角旋轉控制盒 -->
         <div class="torsion-box" id="torsionBox" style="display: none;">
           <div class="torsion-header">
             <select id="bondSelect" title="選擇要旋轉的單鍵"></select>
@@ -143,6 +147,6 @@
     </div>
   </div>
 
-  <script src="app.js?v=12"></script>
+  <script src="./app.js?v=13"></script>
 </body>
 </html>
